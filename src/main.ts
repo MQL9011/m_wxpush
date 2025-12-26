@@ -30,7 +30,7 @@ async function bootstrap() {
 
   await app.listen(port);
   logger.log(`🚀 微信服务号消息推送服务已启动: http://localhost:${port}`);
-  logger.log(`📝 微信验证接口: http://localhost:${port}/api/wechat`);
+  logger.log(`📝 微信验证接口: http://localhost:${port}/wxapi/wechat`);
 }
 
 bootstrap();
