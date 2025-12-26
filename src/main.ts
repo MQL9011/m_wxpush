@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { LoggingInterceptor, LoggingService } from './common/logging';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -19,6 +20,10 @@ async function bootstrap() {
     }),
   );
 
+  // 全局日志拦截器
+  const loggingService = app.get(LoggingService);
+  app.useGlobalInterceptors(new LoggingInterceptor(loggingService));
+
   // 启用 CORS
   app.enableCors();
 
@@ -31,6 +36,8 @@ async function bootstrap() {
   await app.listen(port);
   logger.log(`🚀 微信服务号消息推送服务已启动: http://localhost:${port}`);
   logger.log(`📝 微信验证接口: http://localhost:${port}/wxapi/wechat`);
+  logger.log(`📋 日志文件路径: ${loggingService.getLogFilePath()}`);
+  logger.log(`📊 日志查看接口: http://localhost:${port}/wxapi/logs`);
 }
 
 bootstrap();

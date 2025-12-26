@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { WechatModule } from './modules/wechat/wechat.module';
 import { UserModule } from './modules/user/user.module';
+import { LoggingModule } from './common/logging';
 
 @Module({
   imports: [
@@ -18,6 +19,8 @@ import { UserModule } from './modules/user/user.module';
       isGlobal: true,
       ttl: 7200 * 1000, // 默认 2 小时
     }),
+    // 日志模块
+    LoggingModule,
     // 微信模块
     WechatModule,
     // 用户模块
