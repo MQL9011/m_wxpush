@@ -19,6 +19,19 @@ export interface LogEntry {
   error?: string;
 }
 
+export interface WechatMessageLog {
+  timestamp: string;
+  direction: 'receive' | 'send';
+  fromUser: string;
+  toUser: string;
+  msgType: string;
+  content?: string;
+  event?: string;
+  eventKey?: string;
+  reply?: string;
+  ip?: string;
+}
+
 @Injectable()
 export class LoggingService {
   private readonly logger = new Logger(LoggingService.name);
@@ -172,6 +185,98 @@ export class LoggingService {
       }
     } catch (error) {
       this.logger.error('清空日志失败', error);
+    }
+  }
+
+  /**
+   * 记录微信消息日志
+   */
+  async writeWechatLog(entry: WechatMessageLog): Promise<void> {
+    try {
+      const logLine = this.formatWechatLog(entry);
+
+      // 读取现有内容
+      let existingContent = '';
+      if (fs.existsSync(this.logFile)) {
+        existingContent = fs.readFileSync(this.logFile, 'utf-8');
+      }
+
+      // 将新日志写在最前面
+      const newContent = logLine + existingContent;
+
+      // 限制日志文件大小（保留最近 10000 行）
+      const lines = newContent.split('\n');
+      const maxLines = 10000;
+      const trimmedContent =
+        lines.length > maxLines
+          ? lines.slice(0, maxLines).join('\n')
+          : newContent;
+
+      fs.writeFileSync(this.logFile, trimmedContent, 'utf-8');
+    } catch (error) {
+      this.logger.error('写入微信日志失败', error);
+    }
+  }
+
+  /**
+   * 格式化微信消息日志
+   */
+  private formatWechatLog(entry: WechatMessageLog): string {
+    const separator = '═'.repeat(80);
+    const directionIcon = entry.direction === 'receive' ? '📩 收到' : '📤 发送';
+    const lines: string[] = [
+      separator,
+      `📅 时间: ${entry.timestamp}`,
+      `${directionIcon}微信消息`,
+      `👤 用户: ${entry.fromUser}`,
+      `📱 消息类型: ${entry.msgType}`,
+    ];
+
+    if (entry.ip) {
+      lines.push(`🌐 IP: ${entry.ip}`);
+    }
+
+    if (entry.event) {
+      lines.push(`🎯 事件: ${entry.event}`);
+    }
+
+    if (entry.eventKey) {
+      lines.push(`🔑 EventKey: ${entry.eventKey}`);
+    }
+
+    if (entry.content) {
+      lines.push(`💬 用户消息内容: ${entry.content}`);
+    }
+
+    if (entry.reply) {
+      // 处理回复内容，去除 XML 格式，只保留文本
+      const replyText = this.extractReplyContent(entry.reply);
+      lines.push(`💬 回复内容: ${replyText}`);
+    }
+
+    lines.push(''); // 空行分隔
+
+    return lines.join('\n') + '\n';
+  }
+
+  /**
+   * 从 XML 回复中提取纯文本内容
+   */
+  private extractReplyContent(xmlReply: string): string {
+    try {
+      // 尝试提取 <Content> 标签中的内容
+      const contentMatch = xmlReply.match(
+        /<Content><!\[CDATA\[(.*?)\]\]><\/Content>/s,
+      );
+      if (contentMatch) {
+        return contentMatch[1];
+      }
+      // 如果不是标准格式，返回原内容（截断）
+      return xmlReply.length > 200
+        ? xmlReply.substring(0, 200) + '...'
+        : xmlReply;
+    } catch {
+      return xmlReply;
     }
   }
 }

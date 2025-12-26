@@ -20,12 +20,16 @@ import {
   SendTextMessageDto,
 } from '../../common/dto/send-message.dto';
 import type { WechatIncomingMessage } from '../../common/interfaces/wechat.interface';
+import { LoggingService } from '../../common/logging';
 
 @Controller('wechat')
 export class WechatController {
   private readonly logger = new Logger(WechatController.name);
 
-  constructor(private readonly wechatService: WechatService) {}
+  constructor(
+    private readonly wechatService: WechatService,
+    private readonly loggingService: LoggingService,
+  ) {}
 
   /**
    * 微信服务器验证接口 (GET)
@@ -74,6 +78,13 @@ export class WechatController {
       return;
     }
 
+    // 获取客户端 IP
+    const clientIp =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      (req.headers['x-real-ip'] as string) ||
+      req.ip ||
+      'unknown';
+
     try {
       // 获取原始 XML 数据
       let rawXml = '';
@@ -95,7 +106,32 @@ export class WechatController {
       );
 
       // 处理不同类型的消息
-      const reply = await this.processMessage(message);
+      const reply = this.processMessage(message);
+
+      // 记录微信消息日志
+      const timestamp = new Date().toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+
+      // 异步写入日志，不阻塞响应
+      void this.loggingService.writeWechatLog({
+        timestamp,
+        direction: 'receive',
+        fromUser: message.FromUserName,
+        toUser: message.ToUserName,
+        msgType: message.MsgType,
+        content: message.Content,
+        event: message.Event,
+        eventKey: message.EventKey,
+        reply: reply || undefined,
+        ip: clientIp,
+      });
 
       if (reply) {
         res.set('Content-Type', 'application/xml');
@@ -112,9 +148,7 @@ export class WechatController {
   /**
    * 处理接收到的消息
    */
-  private async processMessage(
-    message: WechatIncomingMessage,
-  ): Promise<string> {
+  private processMessage(message: WechatIncomingMessage): string {
     const { MsgType, FromUserName, ToUserName, Event } = message;
 
     switch (MsgType) {
