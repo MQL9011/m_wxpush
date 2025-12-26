@@ -23,7 +23,7 @@ async function bootstrap() {
   app.enableCors();
 
   // 设置全局前缀
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('wxapi');
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3000);
